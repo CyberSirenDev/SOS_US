@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOS_US - Real-Time Social Sentiment Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .post-input {
+            grid-column: 1 / -1;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .input-group textarea {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card.positive {
+            border-color: #28a745;
+            color: #28a745;
+        }
+
+        .stat-card.neutral {
+            border-color: #ffc107;
+            color: #ffc107;
+        }
+
+        .stat-card.negative {
+            border-color: #dc3545;
+            color: #dc3545;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .recent-posts {
+            grid-column: 1 / -1;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .post-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid;
+        }
+
+        .post-item.positive {
+            border-left-color: #28a745;
+        }
+
+        .post-item.neutral {
+            border-left-color: #ffc107;
+        }
+
+        .post-item.negative {
+            border-left-color: #dc3545;
+        }
+
+        .post-text {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+
+        .post-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .sentiment-badge {
+            padding: 0.2rem 0.6rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .sentiment-badge.positive {
+            background: #28a745;
+            color: white;
+        }
+
+        .sentiment-badge.neutral {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .sentiment-badge.negative {
+            background: #dc3545;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚨 SOS_US - Social Sentiment Analyzer</h1>
+        <p>Real-time AI dashboard classifying live posts and visualizing public opinion trends</p>
+    </div>
+
+    <div class="container">
+        <div class="card post-input">
+            <h2>📝 Analyze Social Media Post</h2>
+            <div class="input-group">
+                <label for="postText">Enter social media post text:</label>
+                <textarea id="postText" placeholder="Type or paste a social media post to analyze its sentiment..."></textarea>
+            </div>
+            <button class="btn" onclick="analyzePost()" id="analyzeBtn">Analyze Sentiment</button>
+        </div>
+
+        <div class="card">
+            <h2>📊 Real-Time Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card positive">
+                    <div class="stat-number" id="positiveCount">0</div>
+                    <div class="stat-label">Positive</div>
+                </div>
+                <div class="stat-card neutral">
+                    <div class="stat-number" id="neutralCount">0</div>
+                    <div class="stat-label">Neutral</div>
+                </div>
+                <div class="stat-card negative">
+                    <div class="stat-number" id="negativeCount">0</div>
+                    <div class="stat-label">Negative</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📈 Sentiment Distribution</h2>
+            <div class="chart-container">
+                <canvas id="sentimentChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card recent-posts">
+            <h2>🕐 Recent Posts</h2>
+            <div id="postsList"></div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize event source for real-time updates
+        let eventSource;
+        let isConnected = false;
+
+        // Chart.js setup
+        const ctx = document.getElementById('sentimentChart').getContext('2d');
+        const sentimentChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Positive', 'Neutral', 'Negative'],
+                datasets: [{
+                    data: [0, 0, 0],
+                    backgroundColor: ['#28a745', '#ffc107', '#dc3545'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Initialize real-time connection
+        function initRealTimeConnection() {
+            eventSource = new EventSource('/api/events');
+            
+            eventSource.onopen = function() {
+                console.log('Connected to server');
+                isConnected = true;
+            };
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.stats) {
+                    updateStats(data.stats);
+                    updateChart(data.stats);
+                }
+            };
+            
+            eventSource.onerror = function() {
+                console.log('Connection error');
+                isConnected = false;
+            };
+        }
+
+        // Socket event handlers
+        window.onload = function() {
+            initRealTimeConnection();
+            loadRecentPosts();
+        };
+
+        // Analyze post function
+        async function analyzePost() {
+            const postText = document.getElementById('postText').value.trim();
+            const btn = document.getElementById('analyzeBtn');
+            
+            if (!postText) {
+                alert('Please enter some text to analyze');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: postText })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('postText').value = '';
+                    
+                    // Add the new post to the list immediately
+                    addPostToList(data);
+                    
+                    // Show success message
+                    showNotification(`Post analyzed as ${data.sentiment.toUpperCase()}!`, data.sentiment);
+                    
+                    // Refresh stats
+                    loadRecentPosts();
+                } else {
+                    alert('Error analyzing post');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error analyzing post');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Analyze Sentiment';
+            }
+        }
+
+        // Load recent posts and stats
+        async function loadRecentPosts() {
+            try {
+                const response = await fetch('/api/recent');
+                const posts = await response.json();
+                
+                const postsList = document.getElementById('postsList');
+                postsList.innerHTML = '';
+                
+                posts.forEach(post => {
+                    addPostToList(post);
+                });
+                
+                // Also load current stats
+                const statsResponse = await fetch('/api/stats');
+                const stats = await statsResponse.json();
+                updateStats(stats);
+                updateChart(stats);
+            } catch (error) {
+                console.error('Error loading recent posts:', error);
+            }
+        }
+
+        // Refresh data periodically
+        setInterval(function() {
+            if (!isConnected) {
+                loadRecentPosts();
+            }
+        }, 10000); // Every 10 seconds
+
+        // Add post to the list
+        function addPostToList(post) {
+            const postsList = document.getElementById('postsList');
+            const postDiv = document.createElement('div');
+            postDiv.className = `post-item ${post.sentiment}`;
+            
+            const timestamp = new Date(post.timestamp).toLocaleString();
+            
+            postDiv.innerHTML = `
+                <div class="post-text">${post.text}</div>
+                <div class="post-meta">
+                    <span class="sentiment-badge ${post.sentiment}">${post.sentiment}</span>
+                    <span>${timestamp}</span>
+                </div>
+            `;
+            
+            postsList.insertBefore(postDiv, postsList.firstChild);
+            
+            // Keep only latest 20 posts visible
+            while (postsList.children.length > 20) {
+                postsList.removeChild(postsList.lastChild);
+            }
+        }
+
+        // Update statistics
+        function updateStats(stats) {
+            document.getElementById('positiveCount').textContent = stats.positive || 0;
+            document.getElementById('neutralCount').textContent = stats.neutral || 0;
+            document.getElementById('negativeCount').textContent = stats.negative || 0;
+        }
+
+        // Update chart
+        function updateChart(stats) {
+            sentimentChart.data.datasets[0].data = [
+                stats.positive || 0,
+                stats.neutral || 0,
+                stats.negative || 0
+            ];
+            sentimentChart.update();
+        }
+
+        // Show notification
+        function showNotification(message, sentiment) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 2rem;
+                background: ${sentiment === 'positive' ? '#28a745' : sentiment === 'negative' ? '#dc3545' : '#ffc107'};
+                color: white;
+                border-radius: 8px;
+                font-weight: 600;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('postText').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                analyzePost();
+            }
+        });
+
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
